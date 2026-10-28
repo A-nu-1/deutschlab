@@ -1,9 +1,15 @@
+
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { grammarRules, grammarExamples, grammarExceptions } from "@/db/schema";
+import {
+  grammarRules,
+  examples,
+  exampleGrammar,
+  grammarExceptions,
+} from "@/db/schema";
 import { isLocalAdminRequest } from "@/lib/admin/local-admin";
 
 export const runtime = "nodejs";
@@ -38,7 +44,10 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   if (!isLocalAdminRequest(request)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Not authorized." },
+      { status: 403 },
+    );
   }
 
   const { id: encodedId } = await context.params;
@@ -48,7 +57,10 @@ export async function PATCH(
   try {
     id = decodeURIComponent(encodedId);
   } catch {
-    return NextResponse.json({ error: "Invalid grammar ID." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid grammar ID." },
+      { status: 400 },
+    );
   }
 
   const body: unknown = await request.json().catch(() => null);
@@ -67,7 +79,12 @@ export async function PATCH(
     const [rule] = await db
       .select({ id: grammarRules.id })
       .from(grammarRules)
-      .where(and(eq(grammarRules.id, id), eq(grammarRules.status, "published")))
+      .where(
+        and(
+          eq(grammarRules.id, id),
+          eq(grammarRules.status, "published"),
+        ),
+      )
       .limit(1);
 
     if (!rule) {
@@ -77,13 +94,14 @@ export async function PATCH(
       );
     }
 
-    // Existing example IDs must belong to this rule.
-    const currentExamples = await db
-      .select({ id: grammarExamples.id })
-      .from(grammarExamples)
-      .where(eq(grammarExamples.ruleId, id));
+    const currentLinks = await db
+      .select({ exampleId: exampleGrammar.exampleId })
+      .from(exampleGrammar)
+      .where(eq(exampleGrammar.ruleId, id));
 
-    const ownedIds = new Set(currentExamples.map((example) => example.id));
+    const ownedIds = new Set(
+      currentLinks.map((item) => item.exampleId),
+    );
 
     const submittedIds = data.examples
       .map((example) => example.id)
@@ -104,7 +122,9 @@ export async function PATCH(
       .from(grammarExceptions)
       .where(eq(grammarExceptions.ruleId, id));
 
-    const ownedExceptionIds = new Set(currentExceptions.map((item) => item.id));
+    const ownedExceptionIds = new Set(
+      currentExceptions.map((item) => item.id),
+    );
 
     const submittedExceptionIds = data.exceptions
       .map((item) => item.id)
@@ -134,31 +154,63 @@ export async function PATCH(
         })
         .where(eq(grammarRules.id, id));
 
+      const retainedExampleIds: string[] = [];
+
       for (const example of data.examples) {
-        if (example.id) {
+        let exampleId = example.id;
+
+        if (exampleId) {
+          // Update the shared sentence itself.
           await tx
-            .update(grammarExamples)
+            .update(examples)
             .set({
               sentenceDe: example.sentenceDe,
-              translationEn: example.translationEn || null,
+              translationEn: example.translationEn,
               explanation: example.explanation || null,
+              cefrLevel: data.cefrLevel,
             })
-            .where(
-              and(
-                eq(grammarExamples.id, example.id),
-                eq(grammarExamples.ruleId, id),
-              ),
-            );
+            .where(eq(examples.id, exampleId));
         } else {
-          await tx.insert(grammarExamples).values({
-            id: crypto.randomUUID(),
-            ruleId: id,
+          // Create a new shared sentence.
+          exampleId = crypto.randomUUID();
+
+          await tx.insert(examples).values({
+            id: exampleId,
             sentenceDe: example.sentenceDe,
-            translationEn: example.translationEn || null,
+            translationEn: example.translationEn,
             explanation: example.explanation || null,
+            cefrLevel: data.cefrLevel,
+            status: "published",
+            sourceType: "manual",
+            createdAt: new Date().toISOString(),
+          });
+
+          await tx.insert(exampleGrammar).values({
+            exampleId,
+            ruleId: id,
           });
         }
+
+        retainedExampleIds.push(exampleId);
       }
+
+      // Remove this rule's links to examples removed in the editor.
+      // Do not delete the shared example records themselves.
+      const removedIds = [...ownedIds].filter(
+        (exampleId) => !retainedExampleIds.includes(exampleId),
+      );
+
+      if (removedIds.length > 0) {
+        await tx
+          .delete(exampleGrammar)
+          .where(
+            and(
+              eq(exampleGrammar.ruleId, id),
+              inArray(exampleGrammar.exampleId, removedIds),
+            ),
+          );
+      }
+
       for (const item of data.exceptions) {
         const values = {
           title: item.title,

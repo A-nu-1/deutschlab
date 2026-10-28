@@ -4,7 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   grammarRules,
-  grammarExamples,
+  examples as sharedExamples,
+  exampleGrammar,
   grammarExceptions,
   nounPatterns,
   vocabulary,
@@ -48,9 +49,18 @@ export default async function RuleDetailPage({ params }: Props) {
 
   const [examples, exceptions, patterns, relations] = await Promise.all([
     db
-      .select()
-      .from(grammarExamples)
-      .where(eq(grammarExamples.ruleId, rule.id)),
+  .select({
+    id: sharedExamples.id,
+    sentenceDe: sharedExamples.sentenceDe,
+    translationEn: sharedExamples.translationEn,
+    explanation: sharedExamples.explanation,
+  })
+  .from(exampleGrammar)
+  .innerJoin(
+    sharedExamples,
+    eq(exampleGrammar.exampleId, sharedExamples.id),
+  )
+  .where(eq(exampleGrammar.ruleId, rule.id)),
 
     db
       .select()

@@ -11,6 +11,7 @@ const responseJsonSchema = {
   type: "object",
   properties: {
     summaryEn: { type: "string" },
+    translationEn: { type: "string" },
     overallLevel: {
       type: "string",
       enum: ["A1", "A2", "B1", "B2", "C1"],
@@ -69,7 +70,13 @@ const responseJsonSchema = {
       },
     },
   },
-  required: ["summaryEn", "overallLevel", "vocabulary", "grammar"],
+  required: [
+    "summaryEn",
+    "translationEn",
+    "overallLevel",
+    "vocabulary",
+    "grammar",
+  ],
 };
 
 export async function POST(request: NextRequest) {
@@ -162,6 +169,10 @@ export async function POST(request: NextRequest) {
           "You are a careful German-language learning assistant.",
           "The learner has passed B1 and aims for C1.",
           "Explain in clear English.",
+          "Provide a complete, faithful English translation of the entire German passage in translationEn.",
+          "Translate every sentence in the original order; do not replace the translation with a summary.",
+          "Preserve the original meaning, negation, tense, and important details.",
+          "Keep summaryEn as a short summary; translationEn must be the full translation.",
           "Analyze actual grammar used in the passage.",
           "Give context-sensitive meanings and dictionary lemmas.",
           "Use the grammatical gender of the noun's lemma.",

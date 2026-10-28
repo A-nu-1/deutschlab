@@ -6,7 +6,9 @@ import { drizzle } from "drizzle-orm/libsql";
 
 import {
   grammarRules,
-  grammarExamples,
+  examples,
+  exampleGrammar,
+  exampleVocabulary,
   grammarExceptions,
   nounPatterns,
   vocabulary,
@@ -536,7 +538,7 @@ async function main() {
   // 5. GRAMMAR EXAMPLES
   // =============================================
 
-  const examples = [
+  const exampleSeeds = [
     {
       rule: "masculine-n-declension",
       key: "name-genitive",
@@ -619,29 +621,69 @@ async function main() {
     },
   ];
 
-  for (const example of examples) {
+ 
+  for (const example of exampleSeeds) {
+    const exampleId = id("example", example.key);
+
+    // Insert or update the shared example itself.
     await db
-      .insert(grammarExamples)
+      .insert(examples)
       .values({
-        id: id("example", example.key),
-        ruleId: id("rule", example.rule),
+        id: exampleId,
         sentenceDe: example.de,
         translationEn: example.en,
         explanation: example.note,
         cefrLevel: example.level,
+        status: "published",
+        sourceType: "manual",
+        createdAt: now,
       })
       .onConflictDoUpdate({
-        target: grammarExamples.id,
+        target: examples.id,
         set: {
           sentenceDe: example.de,
           translationEn: example.en,
           explanation: example.note,
           cefrLevel: example.level,
+          status: "published",
         },
       });
+
+    // Link the shared example to its grammar rule.
+    await db
+      .insert(exampleGrammar)
+      .values({
+        exampleId,
+        ruleId: id("rule", example.rule),
+      })
+      .onConflictDoNothing();
+
+      
+    // Link the shared example to matching vocabulary entries.
+    const vocabularyLinks: Record<string, string[]> = {
+      "name-genitive": ["der-name", "der-mann"],
+      "junge-accusative": ["der-junge"],
+      zeitung: ["die-zeitung"],
+      moeglichkeit: ["die-moeglichkeit"],
+      maedchen: ["das-maedchen"],
+      montag: ["der-montag"],
+      gehen: ["verb-gehen"],
+    };
+
+    for (const wordKey of vocabularyLinks[example.key] ?? []) {
+      await db
+        .insert(exampleVocabulary)
+        .values({
+          exampleId,
+          vocabularyId: id("word", wordKey),
+        })
+        .onConflictDoNothing();
+    }
+
   }
 
-  console.log(`✅ ${examples.length} grammar examples`);
+  console.log(`✅ ${exampleSeeds.length} shared grammar examples`);
+
 
   // =============================================
   // 6. EXCEPTIONS

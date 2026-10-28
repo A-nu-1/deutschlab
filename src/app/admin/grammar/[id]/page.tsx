@@ -5,7 +5,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   grammarRules,
-  grammarExamples,
+  examples as sharedExamples,
+  exampleGrammar,
   grammarExceptions,
 } from "@/db/schema";
 import GrammarEditor from "./grammar-editor";
@@ -46,14 +47,23 @@ export default async function EditGrammarPage({ params }: Props) {
   if (!rule) notFound();
 
   const examples = await db
-    .select()
-    .from(grammarExamples)
-    .where(eq(grammarExamples.ruleId, rule.id));
+    .select({
+      id: sharedExamples.id,
+      sentenceDe: sharedExamples.sentenceDe,
+      translationEn: sharedExamples.translationEn,
+      explanation: sharedExamples.explanation,
+    })
+    .from(exampleGrammar)
+    .innerJoin(
+      sharedExamples,
+      eq(exampleGrammar.exampleId, sharedExamples.id)
+    )
+    .where(eq(exampleGrammar.ruleId, rule.id));
 
-    const exceptions = await db
-  .select()
-  .from(grammarExceptions)
-  .where(eq(grammarExceptions.ruleId, rule.id));
+  const exceptions = await db
+    .select()
+    .from(grammarExceptions)
+    .where(eq(grammarExceptions.ruleId, rule.id));
 
   return (
     <main className="min-h-screen bg-[#11131f] px-5 py-8 text-white md:px-10">
@@ -71,16 +81,16 @@ export default async function EditGrammarPage({ params }: Props) {
           initialExamples={examples.map((example) => ({
             id: example.id,
             sentenceDe: example.sentenceDe,
-            translationEn: example.translationEn ?? "",
+            translationEn: example.translationEn,
             explanation: example.explanation ?? "",
           }))}
           initialExceptions={exceptions.map((item) => ({
-  id: item.id,
-  title: item.title,
-  explanation: item.explanation,
-  exampleDe: item.exampleDe ?? "",
-  exampleEn: item.exampleEn ?? "",
-}))}
+            id: item.id,
+            title: item.title,
+            explanation: item.explanation,
+            exampleDe: item.exampleDe ?? "",
+            exampleEn: item.exampleEn ?? "",
+          }))}
         />
       </div>
     </main>

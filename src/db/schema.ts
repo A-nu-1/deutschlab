@@ -35,23 +35,7 @@ export const grammarRules = sqliteTable(
   ]
 );
 
-// 2. Examples belonging to grammar rules
-export const grammarExamples = sqliteTable(
-  "grammar_examples",
-  {
-    id: text("id").primaryKey().$defaultFn(newId),
-    ruleId: text("rule_id")
-      .notNull()
-      .references(() => grammarRules.id, {
-        onDelete: "cascade",
-      }),
-    sentenceDe: text("sentence_de").notNull(),
-    translationEn: text("translation_en"),
-    explanation: text("explanation"),
-    cefrLevel: text("cefr_level"),
-  },
-  (t) => [index("example_rule_idx").on(t.ruleId)]
-);
+
 
 // 3. Grammar exceptions and common mistakes
 export const grammarExceptions = sqliteTable(
@@ -175,23 +159,71 @@ export const conceptRelations = sqliteTable(
   ]
 );
 
-// 8. Example sentences belonging to vocabulary entries
-export const vocabularyExamples = sqliteTable(
-  "vocabulary_examples",
+
+/**
+ * Shared example library.
+ * Each German sentence and its English translation is stored once.
+ */
+export const examples = sqliteTable(
+  "examples",
   {
     id: text("id").primaryKey().$defaultFn(newId),
-
-    vocabularyId: text("vocabulary_id")
-      .notNull()
-      .references(() => vocabulary.id, {
-        onDelete: "cascade",
-      }),
-
     sentenceDe: text("sentence_de").notNull(),
     translationEn: text("translation_en").notNull(),
     explanation: text("explanation"),
+    cefrLevel: text("cefr_level"),
+    status: text("status").notNull().default("draft"),
+    sourceType: text("source_type").notNull().default("manual"),
+    createdAt: text("created_at").notNull().default(""),
   },
   (t) => [
-    index("vocabulary_example_word_idx").on(t.vocabularyId),
+    index("examples_level_idx").on(t.cefrLevel),
+    index("examples_status_idx").on(t.status),
+  ]
+);
+
+/**
+ * Connects one example to existing vocabulary entries.
+ */
+export const exampleVocabulary = sqliteTable(
+  "example_vocabulary",
+  {
+    exampleId: text("example_id")
+      .notNull()
+      .references(() => examples.id, { onDelete: "cascade" }),
+
+    vocabularyId: text("vocabulary_id")
+      .notNull()
+      .references(() => vocabulary.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("example_vocabulary_unique_idx").on(
+      t.exampleId,
+      t.vocabularyId
+    ),
+    index("example_vocabulary_word_idx").on(t.vocabularyId),
+  ]
+);
+
+/**
+ * Connects one example to existing grammar rules.
+ */
+export const exampleGrammar = sqliteTable(
+  "example_grammar",
+  {
+    exampleId: text("example_id")
+      .notNull()
+      .references(() => examples.id, { onDelete: "cascade" }),
+
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => grammarRules.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    uniqueIndex("example_grammar_unique_idx").on(
+      t.exampleId,
+      t.ruleId
+    ),
+    index("example_grammar_rule_idx").on(t.ruleId),
   ]
 );

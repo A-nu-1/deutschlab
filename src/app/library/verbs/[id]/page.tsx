@@ -1,9 +1,15 @@
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, and } from "drizzle-orm";
 
 import { db } from "@/db";
-import { vocabulary, verbForms, vocabularyExamples } from "@/db/schema";
+import {
+  vocabulary,
+  verbForms,
+  examples as sharedExamples,
+  exampleVocabulary,
+} from "@/db/schema";
 import SpeakButton from "../../rules/[slug]/speak-button";
 
 export const runtime = "nodejs";
@@ -74,17 +80,24 @@ export default async function VerbDetailPage({ params }: Props) {
     notFound();
   }
 
-  if (!verb) notFound();
-
   const forms = await db
     .select()
     .from(verbForms)
     .where(eq(verbForms.vocabularyId, verb.id));
 
   const examples = await db
-    .select()
-    .from(vocabularyExamples)
-    .where(eq(vocabularyExamples.vocabularyId, verb.id));
+    .select({
+      id: sharedExamples.id,
+      sentenceDe: sharedExamples.sentenceDe,
+      translationEn: sharedExamples.translationEn,
+      explanation: sharedExamples.explanation,
+    })
+    .from(exampleVocabulary)
+    .innerJoin(
+      sharedExamples,
+      eq(exampleVocabulary.exampleId, sharedExamples.id),
+    )
+    .where(eq(exampleVocabulary.vocabularyId, verb.id));
 
   const auxiliary = forms.find((form) => form.auxiliary)?.auxiliary;
 
@@ -109,11 +122,14 @@ export default async function VerbDetailPage({ params }: Props) {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <h1 className="text-4xl font-bold text-violet-300">{verb.lemma}</h1>
+            <h1 className="text-4xl font-bold text-violet-300">
+              {verb.lemma}
+            </h1>
             <SpeakButton text={verb.lemma} />
           </div>
 
           <p className="mt-3 text-slate-300">{verb.meaningEn}</p>
+
           {process.env.NODE_ENV === "development" && (
             <Link
               href={`/admin/published-vocabulary/${encodeURIComponent(verb.id)}`}
@@ -122,6 +138,7 @@ export default async function VerbDetailPage({ params }: Props) {
               ✏️ Edit Vocabulary & Generate Examples
             </Link>
           )}
+
           {auxiliary && (
             <p className="mt-4 text-sm text-emerald-300">
               Perfekt auxiliary: {auxiliary}
@@ -143,7 +160,8 @@ export default async function VerbDetailPage({ params }: Props) {
               )
               .sort(
                 (a, b) =>
-                  personOrder.indexOf(a.person) - personOrder.indexOf(b.person),
+                  personOrder.indexOf(a.person) -
+                  personOrder.indexOf(b.person),
               );
 
             if (selectedForms.length === 0) return null;
@@ -184,6 +202,7 @@ export default async function VerbDetailPage({ params }: Props) {
             );
           })}
         </div>
+
         {examples.length > 0 && (
           <section className="rounded-2xl border border-violet-500/20 bg-[#1c2030] p-6">
             <h2 className="mb-5 text-xl font-semibold text-violet-300">
@@ -218,6 +237,7 @@ export default async function VerbDetailPage({ params }: Props) {
             </div>
           </section>
         )}
+
         <footer className="pb-8 text-center text-xs text-slate-500">
           DeutschLab · Learn, Listen, Speak 💜
         </footer>

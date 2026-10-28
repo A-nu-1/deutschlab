@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, and } from "drizzle-orm";
@@ -7,7 +8,8 @@ import {
   vocabulary,
   nounPatterns,
   grammarRules,
-  vocabularyExamples,
+  examples as sharedExamples,
+  exampleVocabulary,
 } from "@/db/schema";
 
 import DeclensionTable from "@/components/declension-table";
@@ -80,12 +82,22 @@ export default async function WordDetailPage({ params }: Props) {
         )
         .limit(1)
     : [];
-  const examples = await db
-    .select()
-    .from(vocabularyExamples)
-    .where(eq(vocabularyExamples.vocabularyId, word.id));
-  const etymology = getWordEtymology(word.lemma);
 
+  const examples = await db
+    .select({
+      id: sharedExamples.id,
+      sentenceDe: sharedExamples.sentenceDe,
+      translationEn: sharedExamples.translationEn,
+      explanation: sharedExamples.explanation,
+    })
+    .from(exampleVocabulary)
+    .innerJoin(
+      sharedExamples,
+      eq(exampleVocabulary.exampleId, sharedExamples.id),
+    )
+    .where(eq(exampleVocabulary.vocabularyId, word.id));
+
+  const etymology = getWordEtymology(word.lemma);
   const pronunciation = style ? `${style.article} ${word.lemma}` : word.lemma;
 
   return (
@@ -123,6 +135,7 @@ export default async function WordDetailPage({ params }: Props) {
             </h1>
 
             <SpeakButton text={pronunciation} />
+
             {process.env.NODE_ENV === "development" && (
               <Link
                 href={`/admin/words/${encodeURIComponent(word.id)}`}
@@ -131,6 +144,7 @@ export default async function WordDetailPage({ params }: Props) {
                 ✏️ Edit Word
               </Link>
             )}
+
             {process.env.NODE_ENV === "development" && (
               <Link
                 href={`/admin/published-vocabulary/${encodeURIComponent(word.id)}`}
@@ -203,6 +217,7 @@ export default async function WordDetailPage({ params }: Props) {
             </div>
           </section>
         )}
+
         {pattern && (
           <section className="rounded-2xl border border-violet-500/20 bg-[#1c2030] p-6">
             <h2 className="text-xl font-semibold text-violet-300">

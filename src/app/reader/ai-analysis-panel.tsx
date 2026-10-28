@@ -202,15 +202,17 @@ export default function AIAnalysisPanel({ text }: Props) {
             library.
           </p>
         </div>
-        {!isOwner && (<input
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
-          placeholder="Your Gemini API key"
-          aria-label="Your Gemini API key"
-          className="w-full max-w-sm rounded-xl border border-white/10 bg-[#11131f] px-4 py-3 text-sm text-white outline-none focus:border-violet-400"
-        />)}
+        {!isOwner && (
+          <input
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder="Your Gemini API key"
+            aria-label="Your Gemini API key"
+            className="w-full max-w-sm rounded-xl border border-white/10 bg-[#11131f] px-4 py-3 text-sm text-white outline-none focus:border-violet-400"
+          />
+        )}
         <button
           type="button"
           onClick={analyze}
@@ -253,6 +255,16 @@ export default function AIAnalysisPanel({ text }: Props) {
             </div>
 
             <p className="leading-7 text-slate-300">{analysis.summaryEn}</p>
+          </div>
+
+          <div className="rounded-xl border border-violet-500/20 bg-[#11131f] p-5">
+            <h3 className="mb-3 font-semibold text-violet-300">
+              🌐 Full English Translation
+            </h3>
+
+            <p className="whitespace-pre-wrap leading-7 text-slate-200">
+              {analysis.translationEn}
+            </p>
           </div>
 
           <div>

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 export const analysisSchema = z.object({
   summaryEn: z.string().max(1500),
+  translationEn: z.string().max(10000),
 
   overallLevel: z.enum([
     "A1", "A2", "B1", "B2", "C1",
@@ -40,5 +41,3 @@ export const analysisSchema = z.object({
 });
 
 export type TextAnalysis = z.infer<typeof analysisSchema>;
-
-
